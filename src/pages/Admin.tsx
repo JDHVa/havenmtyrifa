@@ -220,7 +220,9 @@ function Login({ onToken }: { onToken: (t: string) => void }) {
       body: JSON.stringify({ user, password }),
     }).catch(() => null)
     setBusy(false)
-    if (!res || !res.ok) return setError('Usuario o contraseña incorrectos.')
+    if (!res) return setError('No se pudo conectar con el servidor.')
+    if (res.status === 404) return setError('La API no está disponible aquí. Usa el sitio de Vercel o npx vercel dev.')
+    if (!res.ok) return setError('Usuario o contraseña incorrectos.')
     const { token } = await res.json()
     try {
       sessionStorage.setItem(KEY, token)
@@ -236,11 +238,11 @@ function Login({ onToken }: { onToken: (t: string) => void }) {
         <h1 className="font-display text-4xl">Panel de orgs</h1>
         <label className="flex flex-col gap-1 font-body">
           Usuario
-          <input value={user} onChange={(e) => setUser(e.target.value)} autoComplete="username" className="border-4 border-bark bg-cream px-3 py-2" />
+          <input value={user} onChange={(e) => setUser(e.target.value)} autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} className="border-4 border-bark bg-cream px-3 py-2" />
         </label>
         <label className="flex flex-col gap-1 font-body">
           Contraseña
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" className="border-4 border-bark bg-cream px-3 py-2" />
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoCapitalize="none" autoCorrect="off" className="border-4 border-bark bg-cream px-3 py-2" />
         </label>
         {error && <p className="font-body text-sm text-rust">{error}</p>}
         <button type="submit" disabled={busy} className="btn bg-orange text-cream">{busy ? '...' : 'Entrar'}</button>

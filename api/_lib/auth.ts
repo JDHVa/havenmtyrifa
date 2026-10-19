@@ -17,7 +17,7 @@ export async function isAuthorized(req: VercelRequest) {
   if (!token || !process.env.JWT_SECRET) return false
   try {
     const { payload } = await jwtVerify(token, secret())
-    return payload.sub === process.env.ADMIN_USER && payload.role === 'org'
+    return payload.sub === process.env.ADMIN_USER?.trim() && payload.role === 'org'
   } catch {
     return false
   }

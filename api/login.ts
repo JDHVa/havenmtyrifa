@@ -11,10 +11,10 @@ const same = (a: string, b: string) => {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).end()
   const { user, password } = (req.body ?? {}) as { user?: string; password?: string }
-  const okUser = same(String(user ?? ''), process.env.ADMIN_USER ?? '')
-  const okPass = same(String(password ?? ''), process.env.ADMIN_PASSWORD ?? '')
+  const okUser = same(String(user ?? '').trim().toLowerCase(), (process.env.ADMIN_USER ?? '').trim().toLowerCase())
+  const okPass = same(String(password ?? '').trim(), (process.env.ADMIN_PASSWORD ?? '').trim())
   if (!okUser || !okPass || !process.env.ADMIN_PASSWORD) {
     return res.status(401).json({ error: 'Credenciales inválidas' })
   }
-  return res.status(200).json({ token: await signToken(process.env.ADMIN_USER!) })
+  return res.status(200).json({ token: await signToken(process.env.ADMIN_USER!.trim()) })
 }
