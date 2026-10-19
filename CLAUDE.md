@@ -45,7 +45,7 @@ Navbar → Hero (cuenta regresiva, CTA "Regístrate" a https://haven.hackclub.co
 - Backend: flujo de reserva, RLS y concurrencia en Supabase.
 
 ## Datos
-- Precio: $150 MXN. Evento: 14 y 15 de noviembre. Pago en efectivo o transferencia a 4213 1660 5091 2512 (Juan Daniel Hernandez Garza).
+- Precio: $150 MXN. Evento: 14 y 15 de noviembre. Pago en efectivo o transferencia; el número de cuenta lo pasa el contacto por WhatsApp y nunca se muestra en el sitio. Sin emojis: íconos de react-bootstrap-icons.
 - Puntos de venta: PrepaTec Garza Laguera (Anna Antunez, +52 1 81 2443 0879), PrepaTec Cumbres (Edson, +52 1 81 2174 7721), EIAO (Jesus, +52 1 81 2892 6313), Ajeno (Edson).
 - Las reservas no expiran: el equipo las retira desde `/admin`.
 - `/admin` usa JWT propio (api/login.ts, api/tickets.ts) con credenciales en variables de entorno, nunca en el código. Exporta a Excel.

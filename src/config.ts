@@ -11,11 +11,6 @@ export const TICKETS = {
   purpose: 'Los boletos son para apoyar la realización del evento Haven Mty.',
 }
 
-export const PAYMENT = {
-  card: '4213 1660 5091 2512',
-  holder: 'Juan Daniel Hernandez Garza',
-}
-
 export type SalePointId = 'garza-laguera' | 'cumbres' | 'eiao' | 'ajeno'
 
 export const SALE_POINTS: { id: SalePointId; label: string; contact: string; phone: string }[] = [

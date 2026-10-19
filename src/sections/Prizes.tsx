@@ -1,5 +1,5 @@
 import { motion } from 'motion/react'
-import { ArrowUpRight, Trophy } from 'lucide-react'
+import { ArrowUpRight, TrophyFill } from 'react-bootstrap-icons'
 import { PRIZES, TICKETS } from '../config'
 import { Reveal } from '../components/ui/Reveal'
 import { TiltCard } from '../components/ui/TiltCard'
@@ -19,7 +19,7 @@ export function Prizes() {
       <div className="relative mx-auto max-w-6xl">
         <Reveal className="text-center">
           <span className="inline-flex items-center gap-2 rounded-full bg-sun/15 px-4 py-1 text-lg text-sun">
-            <Trophy className="size-5" /> Rifa Haven MTY
+            <TrophyFill className="size-5" /> Rifa Haven MTY
           </span>
           <h2 className="mt-4 font-display text-6xl text-sun sm:text-8xl">Premios</h2>
           <p className="mx-auto mt-4 max-w-xl text-xl text-cream/85">

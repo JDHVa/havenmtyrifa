@@ -1,6 +1,7 @@
 import { motion } from 'motion/react'
 import { EVENT, TICKETS } from '../config'
 import { Leaves } from '../components/ui/Leaves'
+import { ArrowRight, HeartFill } from 'react-bootstrap-icons'
 
 export function Footer() {
   return (
@@ -19,10 +20,10 @@ export function Footer() {
         <p className="font-display text-6xl text-sun sm:text-8xl">¡Nos vemos ahí!</p>
         <p className="text-xl">{EVENT.dates} · Monterrey</p>
         <a href={EVENT.registerUrl} target="_blank" rel="noreferrer" className="btn bg-orange text-cream">
-          Regístrate al evento →
+          Regístrate al evento <ArrowRight className="size-5" />
         </a>
         <p className="max-w-md text-cream/70">{TICKETS.purpose}</p>
-        <p className="text-sm text-cream/50">Hecho con 🧡 por el equipo de Haven MTY</p>
+        <p className="text-sm text-cream/50"><span className="inline-flex items-center gap-1.5">Hecho con <HeartFill className="size-3.5 text-orange" /> por el equipo de Haven MTY</span></p>
       </div>
     </footer>
   )

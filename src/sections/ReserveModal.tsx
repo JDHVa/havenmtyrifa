@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState } from 'react'
-import { PAYMENT, SALE_POINTS, TICKETS, type PaymentMethod, type SalePointId } from '../config'
+import { CashCoin, CreditCard, ExclamationTriangleFill, Whatsapp, XLg } from 'react-bootstrap-icons'
+import { SALE_POINTS, TICKETS, type PaymentMethod, type SalePointId } from '../config'
 import { supabase } from '../lib/supabase'
 import { buildWhatsAppLink, formatMty } from '../lib/whatsapp'
 
@@ -114,7 +115,7 @@ export function ReserveModal({
               Boleto #{number}
             </h3>
             <button type="button" onClick={onClose} className="grid size-10 place-items-center rounded-full bg-cream text-bark transition hover:rotate-90 hover:bg-orange hover:text-cream" aria-label="Cerrar">
-              ✕
+              <XLg className="size-4" />
             </button>
           </div>
 
@@ -170,7 +171,10 @@ export function ReserveModal({
                       onClick={() => setPayment(m)}
                       className={`rounded-2xl border-2 border-bark/20 px-2 py-2.5 transition-all hover:-translate-y-0.5 ${payment === m ? 'bg-lime text-bark' : 'bg-cream text-bark hover:bg-sand'}`}
                     >
-                      {m === 'efectivo' ? '💵 Efectivo' : '💳 Transferencia'}
+                      <span className="inline-flex items-center justify-center gap-2">
+                        {m === 'efectivo' ? <CashCoin className="size-5" /> : <CreditCard className="size-5" />}
+                        {m === 'efectivo' ? 'Efectivo' : 'Transferencia'}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -204,7 +208,9 @@ export function ReserveModal({
               </div>
 
               <div className="rounded-2xl bg-cream p-4">
-                <p className="font-body text-base">⚠️ Tu boleto aún no está confirmado.</p>
+                <p className="flex items-center gap-2 font-body text-base text-rust">
+                  <ExclamationTriangleFill className="size-5 shrink-0" /> Tu boleto aún no está confirmado.
+                </p>
                 <p className="mt-1">
                   Manda el mensaje por WhatsApp a <strong>{point.contact}</strong> ({point.label}) para acordar el pago de{' '}
                   <strong>${TICKETS.price} MXN</strong>. Si no se paga, el equipo puede liberar el número.
@@ -213,19 +219,24 @@ export function ReserveModal({
 
               <div className="rounded-2xl bg-cream p-4">
                 {payment === 'efectivo' ? (
-                  <p>💵 Pagarás en <strong>efectivo</strong> directamente con {point.contact}.</p>
+                  <p className="flex items-start gap-2">
+                    <CashCoin className="mt-1 size-5 shrink-0 text-olive" />
+                    <span>
+                      Pagarás en <strong>efectivo</strong> directamente con {point.contact}.
+                    </span>
+                  </p>
                 ) : (
-                  <>
-                    <p>💳 Deposita o transfiere a:</p>
-                    <p className="mt-1 font-display text-3xl tracking-wide">{PAYMENT.card}</p>
-                    <p>{PAYMENT.holder}</p>
-                    <p className="mt-1">Concepto: {result.code}. Envía tu comprobante por WhatsApp.</p>
-                  </>
+                  <p className="flex items-start gap-2">
+                    <CreditCard className="mt-1 size-5 shrink-0 text-olive" />
+                    <span>
+                      Pagarás por <strong>transferencia</strong>. {point.contact} te pasará el número por WhatsApp. Envía tu comprobante con el folio {result.code}.
+                    </span>
+                  </p>
                 )}
               </div>
 
               <a href={result.link} target="_blank" rel="noreferrer" className="btn bg-lime text-center text-bark">
-                Enviar mensaje por WhatsApp →
+                <Whatsapp className="size-5" /> Enviar mensaje por WhatsApp
               </a>
               <p className="text-center text-xs">{TICKETS.purpose}</p>
             </motion.div>

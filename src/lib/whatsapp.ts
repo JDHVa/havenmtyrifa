@@ -1,4 +1,4 @@
-import { PAYMENT, SALE_POINTS, TICKETS, type PaymentMethod, type SalePointId } from '../config'
+import { SALE_POINTS, TICKETS, type PaymentMethod, type SalePointId } from '../config'
 
 export const formatMty = (iso: string) =>
   new Intl.DateTimeFormat('es-MX', {
@@ -19,19 +19,20 @@ export function buildWhatsAppLink(input: {
   const point = SALE_POINTS.find((p) => p.id === input.salePoint)!
   const pay =
     input.payment === 'efectivo'
-      ? 'Pagaré en efectivo.'
-      : `Pagaré por transferencia/depósito a la tarjeta ${PAYMENT.card} (${PAYMENT.holder}).`
+      ? 'Voy a pagar en efectivo.'
+      : '¿Me puedes pasar el número para poder transferir?'
   const text = [
-    `¡Hola ${point.contact}! Reservé un boleto para Haven Mty 🏡`,
+    `Hola ${point.contact}, reservé un boleto para Haven Mty.`,
     '',
-    `🎟️ Boleto: #${input.number}`,
-    `🔖 Folio: ${input.code}`,
-    `👤 Nombre: ${input.name}`,
-    `📍 Procedencia: ${input.origin}`,
-    `🏫 Punto de venta: ${point.label}`,
-    `🕒 Registro: ${formatMty(input.reservedAt)}`,
-    `💵 Monto: $${TICKETS.price} MXN`,
-    `💳 ${pay}`,
+    `Boleto: #${input.number}`,
+    `Folio: ${input.code}`,
+    `Nombre: ${input.name}`,
+    `Procedencia: ${input.origin}`,
+    `Punto de venta: ${point.label}`,
+    `Registro: ${formatMty(input.reservedAt)}`,
+    `Monto: $${TICKETS.price} MXN`,
+    '',
+    pay,
     '',
     TICKETS.purpose,
   ].join('\n')

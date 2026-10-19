@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { Plus } from 'lucide-react'
-import { EVENT, PAYMENT, TICKETS } from '../config'
+import { PlusLg } from 'react-bootstrap-icons'
+import { EVENT, TICKETS } from '../config'
 import { Reveal } from '../components/ui/Reveal'
 
 const QA = [
   ['¿Para qué es el dinero de los boletos?', TICKETS.purpose],
   ['¿Cuánto cuesta?', `$${TICKETS.price} MXN por boleto. Puedes apartar varios números.`],
-  ['¿Cómo pago?', `En efectivo con tu punto de venta o por transferencia a la tarjeta ${PAYMENT.card} a nombre de ${PAYMENT.holder}.`],
+  ['¿Cómo pago?', 'En efectivo con tu punto de venta o por transferencia. Si eliges transferencia, tu contacto te pasa el número por WhatsApp.'],
   ['¿Mi boleto queda confirmado al apartarlo?', 'No. Queda reservado hasta que mandes el mensaje y pagues. Si no se paga, el equipo puede liberar el número.'],
   ['¿Dónde es el sorteo?', 'El sorteo se hace durante el evento, no en esta página.'],
   ['¿Cómo me registro al evento?', `Desde la página oficial de Hack Club: ${EVENT.registerUrl}`],
@@ -36,7 +36,7 @@ export function Faq() {
                     animate={{ rotate: open === i ? 135 : 0 }}
                     className="grid size-10 shrink-0 place-items-center rounded-full bg-orange text-cream"
                   >
-                    <Plus className="size-5" />
+                    <PlusLg className="size-5" />
                   </motion.span>
                 </button>
                 <AnimatePresence initial={false}>

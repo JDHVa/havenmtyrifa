@@ -1,6 +1,6 @@
 import { motion } from 'motion/react'
 import { useState } from 'react'
-import { Ticket } from 'lucide-react'
+import { TicketPerforatedFill } from 'react-bootstrap-icons'
 import { TICKETS } from '../config'
 import { useTickets } from '../lib/useTickets'
 import { Reveal } from '../components/ui/Reveal'
@@ -24,7 +24,7 @@ export function Tickets() {
       <div className="relative mx-auto max-w-6xl">
         <Reveal className="text-center">
           <span className="inline-flex items-center gap-2 rounded-full bg-orange/15 px-4 py-1 text-lg text-rust">
-            <Ticket className="size-5" /> 200 boletos
+            <TicketPerforatedFill className="size-5" /> 200 boletos
           </span>
           <h2 className="mt-4 font-display text-5xl text-bark sm:text-7xl">
             Reserva tu <span className="text-gradient">boleto</span>

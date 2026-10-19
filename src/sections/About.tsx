@@ -1,13 +1,13 @@
 import { motion, useScroll, useTransform } from 'motion/react'
 import { useRef } from 'react'
-import { Code2, Sparkles, Users } from 'lucide-react'
+import { CodeSlash, PeopleFill, Stars } from 'react-bootstrap-icons'
 import { Reveal } from '../components/ui/Reveal'
 import { EVENT } from '../config'
 
 const CARDS = [
-  { title: 'Construye', text: 'Crea proyectos reales con otros estudiantes, sin importar tu nivel.', Icon: Code2, color: 'bg-lime', rot: -3 },
-  { title: 'Aprende', text: 'Talleres, mentores y mucha comida para mantener la energía arriba.', Icon: Sparkles, color: 'bg-sun', rot: 2 },
-  { title: 'Comparte', text: 'Conoce a la comunidad de Hack Club en Monterrey y presume lo que hiciste.', Icon: Users, color: 'bg-sand', rot: -2 },
+  { title: 'Construye', text: 'Crea proyectos reales con otros estudiantes, sin importar tu nivel.', Icon: CodeSlash, color: 'bg-lime', rot: -3 },
+  { title: 'Aprende', text: 'Talleres, mentores y mucha comida para mantener la energía arriba.', Icon: Stars, color: 'bg-sun', rot: 2 },
+  { title: 'Comparte', text: 'Conoce a la comunidad de Hack Club en Monterrey y presume lo que hiciste.', Icon: PeopleFill, color: 'bg-sand', rot: -2 },
 ]
 
 export function About() {

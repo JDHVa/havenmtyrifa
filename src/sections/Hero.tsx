@@ -5,6 +5,7 @@ import { SplitText } from '../components/ui/SplitText'
 import { Countdown } from '../components/ui/Countdown'
 import { Magnet } from '../components/ui/Magnet'
 import { Leaves } from '../components/ui/Leaves'
+import { ArrowRight, CalendarHeartFill, TicketPerforatedFill } from 'react-bootstrap-icons'
 
 export function Hero() {
   const ref = useRef<HTMLElement>(null)
@@ -67,7 +68,9 @@ export function Hero() {
           transition={{ type: 'spring', stiffness: 200, damping: 14, delay: 0.3 }}
           className="rounded-full bg-cream/80 px-5 py-2 text-lg text-bark shadow-lg backdrop-blur"
         >
-          ✦ {EVENT.dates} · Monterrey ✦
+          <span className="inline-flex items-center gap-2">
+            <CalendarHeartFill className="size-4 text-orange" /> {EVENT.dates} · Monterrey
+          </span>
         </motion.span>
 
         <motion.div style={{ x: logoX, y: logoY }} className="relative mt-4">
@@ -112,12 +115,12 @@ export function Hero() {
         >
           <Magnet>
             <a href="#boletos" className="btn bg-orange text-cream">
-              Reserva tu boleto · ${TICKETS.price}
+              <TicketPerforatedFill className="size-5" /> Reserva tu boleto · ${TICKETS.price}
             </a>
           </Magnet>
           <Magnet>
             <a href={EVENT.registerUrl} target="_blank" rel="noreferrer" className="btn bg-lime text-bark">
-              Regístrate al evento →
+              Regístrate al evento <ArrowRight className="size-5" />
             </a>
           </Magnet>
         </motion.div>

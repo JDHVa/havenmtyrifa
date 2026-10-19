@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { motion } from 'motion/react'
-import { Search } from 'lucide-react'
+import { Search } from 'react-bootstrap-icons'
 import { supabase, type TicketStatus } from '../lib/supabase'
 import { Reveal } from '../components/ui/Reveal'
 
 const LABEL: Record<TicketStatus, { text: string; cls: string }> = {
   available: { text: 'Disponible: nadie lo ha apartado.', cls: 'bg-cream' },
   reserved: { text: 'Reservado: pendiente de pago.', cls: 'bg-sun' },
-  paid: { text: '¡Pagado! Boleto confirmado. 🎉', cls: 'bg-lime' },
+  paid: { text: '¡Pagado! Boleto confirmado.', cls: 'bg-lime' },
 }
 
 export function Verify() {

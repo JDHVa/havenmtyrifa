@@ -1,3 +1,5 @@
+import { Flower1 } from 'react-bootstrap-icons'
+
 const ITEMS = ['Hack Club', 'Haven MTY', '14 y 15 de noviembre', 'Apoya el evento', 'Reserva tu boleto', 'Construye cosas chidas']
 
 function Row({ reverse, className }: { reverse?: boolean; className: string }) {
@@ -8,7 +10,7 @@ function Row({ reverse, className }: { reverse?: boolean; className: string }) {
         {list.map((t, i) => (
           <span key={i} className="flex items-center gap-10">
             {t}
-            <span className="inline-block animate-spin-slow text-2xl">✿</span>
+            <Flower1 className="size-7 animate-spin-slow" />
           </span>
         ))}
       </div>
