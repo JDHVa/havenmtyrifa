@@ -1,6 +1,6 @@
-import { motion } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 import { useState } from 'react'
-import { TicketPerforatedFill } from 'react-bootstrap-icons'
+import { ChevronLeft, ChevronRight, QuestionLg, TicketPerforatedFill } from 'react-bootstrap-icons'
 import { TICKETS } from '../config'
 import { useTickets } from '../lib/useTickets'
 import { Reveal } from '../components/ui/Reveal'
@@ -13,10 +13,15 @@ const STYLE = {
   paid: 'bg-bark text-sand/70 cursor-not-allowed',
 }
 
+const SHEETS = Math.max(1, Math.ceil(TICKETS.total / TICKETS.perSheet))
+
 export function Tickets() {
-  const { get, taken, available, loading, markLocal, online } = useTickets()
+  const { get, taken, loading, markLocal, online } = useTickets()
   const [selected, setSelected] = useState<number | null>(null)
-  const pct = Math.round((taken / TICKETS.total) * 100)
+  const [sheet, setSheet] = useState(0)
+  const first = sheet * TICKETS.perSheet + 1
+  const last = Math.min(first + TICKETS.perSheet - 1, TICKETS.total)
+  const numbers = Array.from({ length: last - first + 1 }, (_, i) => first + i)
 
   return (
     <section id="boletos" className="dots relative overflow-hidden px-4 py-28">
@@ -24,34 +29,29 @@ export function Tickets() {
       <div className="relative mx-auto max-w-6xl">
         <Reveal className="text-center">
           <span className="inline-flex items-center gap-2 rounded-full bg-orange/15 px-4 py-1 text-lg text-rust">
-            <TicketPerforatedFill className="size-5" /> 200 boletos
+            <TicketPerforatedFill className="size-5" /> Hojas de {TICKETS.perSheet} boletos
           </span>
           <h2 className="mt-4 font-display text-5xl text-bark sm:text-7xl">
             Reserva tu <span className="text-gradient">boleto</span>
           </h2>
           <p className="mx-auto mt-5 max-w-2xl text-xl text-bark/85">
-            Cada boleto cuesta <strong className="text-orange">${TICKETS.price} MXN</strong>. {TICKETS.purpose}
+            Cada boleto cuesta <strong className="text-orange">${TICKETS.price} MXN</strong> o llévate{' '}
+            <strong className="text-orange">{TICKETS.promo.qty} por ${TICKETS.promo.price} MXN</strong>. {TICKETS.purpose}
           </p>
         </Reveal>
 
         <Reveal delay={0.1}>
           <div className="mx-auto mt-10 grid max-w-xl grid-cols-2 gap-5">
             <motion.div whileHover={{ rotate: -2, scale: 1.04 }} className="card bg-lime p-5 text-center">
-              <div className="font-display text-6xl text-bark"><CountUp to={available} /></div>
+              <div className="flex h-[1em] items-center justify-center font-display text-6xl text-bark" aria-label="Boletos disponibles desconocidos">
+                <QuestionLg className="size-14 animate-float" />
+              </div>
               <div className="text-lg text-bark">disponibles</div>
             </motion.div>
             <motion.div whileHover={{ rotate: 2, scale: 1.04 }} className="card bg-orange p-5 text-center">
               <div className="font-display text-6xl text-cream"><CountUp to={taken} /></div>
               <div className="text-lg text-cream">apartados</div>
             </motion.div>
-          </div>
-          <div className="mx-auto mt-6 h-4 max-w-xl overflow-hidden rounded-full bg-sand/40">
-            <motion.div
-              initial={{ width: 0 }}
-              whileInView={{ width: `${Math.max(pct, 2)}%` }}
-              transition={{ duration: 1.2, ease: 'easeOut' }}
-              className="h-full rounded-full bg-gradient-to-r from-lime via-sun to-orange"
-            />
           </div>
         </Reveal>
 
@@ -69,28 +69,61 @@ export function Tickets() {
 
         <Reveal delay={0.15}>
           <div className="card mt-10 bg-gradient-to-br from-sun/70 to-sand/60 p-3 backdrop-blur sm:p-6">
-            <div className={`grid grid-cols-8 gap-1.5 sm:grid-cols-10 sm:gap-2 lg:grid-cols-20 ${loading ? 'animate-pulse' : ''}`}>
-              {Array.from({ length: TICKETS.total }, (_, i) => i + 1).map((n) => {
-                const s = get(n)
-                return (
-                  <motion.button
-                    key={n}
-                    type="button"
-                    disabled={s !== 'available' || loading}
-                    onClick={() => setSelected(n)}
-                    initial={{ opacity: 0, scale: 0.4 }}
-                    whileInView={{ opacity: 1, scale: 1 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: (n % 20) * 0.02 + Math.floor((n - 1) / 20) * 0.03, type: 'spring', stiffness: 260, damping: 18 }}
-                    whileTap={s === 'available' ? { scale: 0.85 } : undefined}
-                    aria-label={`Boleto ${n}, ${s === 'available' ? 'disponible' : s === 'paid' ? 'pagado' : 'reservado'}`}
-                    className={`relative aspect-square rounded-xl text-sm transition-[background-color,box-shadow,transform] duration-200 sm:text-base ${STYLE[s]}`}
-                  >
-                    {n}
-                  </motion.button>
-                )
-              })}
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setSheet((s) => s - 1)}
+                disabled={sheet === 0}
+                aria-label="Hoja anterior"
+                className="grid size-11 place-items-center rounded-full bg-cream text-bark shadow transition hover:bg-lime disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-cream"
+              >
+                <ChevronLeft className="size-5" />
+              </button>
+              <div className="text-center">
+                <div className="font-display text-3xl text-bark sm:text-4xl">Hoja {sheet + 1} de ?</div>
+                <div className="text-base text-bark/75">Boletos {first} al {last}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSheet((s) => s + 1)}
+                disabled={sheet >= SHEETS - 1}
+                aria-label="Hoja siguiente"
+                className="grid size-11 place-items-center rounded-full bg-cream text-bark shadow transition hover:bg-lime disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-cream"
+              >
+                <ChevronRight className="size-5" />
+              </button>
             </div>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={sheet}
+                initial={{ opacity: 0, x: 40 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -40 }}
+                transition={{ duration: 0.25 }}
+                className={`grid grid-cols-8 gap-1.5 sm:grid-cols-10 sm:gap-2 lg:grid-cols-20 ${loading ? 'animate-pulse' : ''}`}
+              >
+                {numbers.map((n, i) => {
+                  const s = get(n)
+                  return (
+                    <motion.button
+                      key={n}
+                      type="button"
+                      disabled={s !== 'available' || loading}
+                      onClick={() => setSelected(n)}
+                      initial={{ opacity: 0, scale: 0.4 }}
+                      whileInView={{ opacity: 1, scale: 1 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: (i % 20) * 0.02 + Math.floor(i / 20) * 0.03, type: 'spring', stiffness: 260, damping: 18 }}
+                      whileTap={s === 'available' ? { scale: 0.85 } : undefined}
+                      aria-label={`Boleto ${n}, ${s === 'available' ? 'disponible' : s === 'paid' ? 'pagado' : 'reservado'}`}
+                      className={`relative aspect-square rounded-xl text-sm transition-[background-color,box-shadow,transform] duration-200 sm:text-base ${STYLE[s]}`}
+                    >
+                      {n}
+                    </motion.button>
+                  )
+                })}
+              </motion.div>
+            </AnimatePresence>
           </div>
         </Reveal>
       </div>

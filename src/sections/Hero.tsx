@@ -83,6 +83,22 @@ export function Hero() {
             transition={{ type: 'spring', stiffness: 120, damping: 10, delay: 0.4 }}
             className="animate-float w-[min(88vw,560px)] drop-shadow-[0_20px_30px_rgba(120,61,43,.45)]"
           />
+          <motion.a
+            href="#boletos"
+            initial={{ opacity: 0, scale: 0, rotate: -40 }}
+            animate={{ opacity: 1, scale: 1, rotate: 12 }}
+            transition={{ type: 'spring', stiffness: 180, damping: 9, delay: 2 }}
+            whileHover={{ scale: 1.12, rotate: -4 }}
+            whileTap={{ scale: 0.92 }}
+            aria-label={`Promoción: ${TICKETS.promo.qty} boletos por $${TICKETS.promo.price}`}
+            className="absolute -right-2 top-2 grid size-28 place-items-center rounded-full border-4 border-dashed border-cream bg-orange text-cream shadow-[0_10px_25px_-5px_rgba(120,61,43,.6)] sm:-right-6 sm:size-36"
+          >
+            <span className="flex flex-col items-center leading-none">
+              <span className="text-xs uppercase tracking-wide sm:text-sm">Promo</span>
+              <span className="font-display text-2xl sm:text-4xl">{TICKETS.promo.qty}x${TICKETS.promo.price}</span>
+              <span className="text-xs sm:text-sm">boletos</span>
+            </span>
+          </motion.a>
         </motion.div>
 
         <h1 className="-mt-2 font-display text-6xl leading-none text-cream [text-shadow:0_4px_0_#783d2b,0_10px_30px_rgba(120,61,43,.5)] sm:text-8xl">
@@ -115,7 +131,7 @@ export function Hero() {
         >
           <Magnet>
             <a href="#boletos" className="btn bg-orange text-cream">
-              <TicketPerforatedFill className="size-5" /> Reserva tu boleto · ${TICKETS.price}
+              <TicketPerforatedFill className="size-5" /> Reserva tu boleto · {TICKETS.promo.qty}x${TICKETS.promo.price}
             </a>
           </Magnet>
           <Magnet>

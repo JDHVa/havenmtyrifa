@@ -4,7 +4,7 @@ import { Reveal } from '../components/ui/Reveal'
 import { SALE_POINTS } from '../config'
 
 const STEPS = [
-  { title: 'Elige tu número', text: 'Escoge un boleto libre del 1 al 200. Se bloquea al instante para todos.', Icon: CursorFill },
+  { title: 'Elige tu número', text: 'Escoge un boleto libre de la hoja que quieras. Se bloquea al instante para todos.', Icon: CursorFill },
   { title: 'Manda el mensaje', text: 'Se abre WhatsApp con tu nombre, folio, hora y procedencia. Envíalo a tu punto de venta.', Icon: Whatsapp },
   { title: 'Paga', text: 'En efectivo o por transferencia. El equipo marca tu boleto como pagado.', Icon: Wallet2 },
 ]

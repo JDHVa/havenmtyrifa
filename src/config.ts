@@ -7,7 +7,9 @@ export const EVENT = {
 
 export const TICKETS = {
   total: 200,
+  perSheet: 200,
   price: 150,
+  promo: { qty: 2, price: 200 },
   purpose: 'Los boletos son para apoyar la realización del evento Haven Mty.',
 }
 
