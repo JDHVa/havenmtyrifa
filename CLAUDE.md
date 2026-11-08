@@ -52,4 +52,4 @@ Navbar → Hero (cuenta regresiva, CTA "Regístrate" a https://haven.hackclub.co
 
 ## Comandos
 - `npm run dev` solo frontend; `npx vercel dev` para probar también `/api`.
-- Ejecutar `supabase/migrations/001_tickets.sql` en el SQL editor de Supabase.
+- Ejecutar `supabase/migrations/001_tickets.sql` y luego `002_multi_tickets.sql` en el SQL editor de Supabase.
