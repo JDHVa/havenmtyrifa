@@ -1,11 +1,14 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { useState } from 'react'
-import { ChevronLeft, ChevronRight, QuestionLg, TicketPerforatedFill } from 'react-bootstrap-icons'
+import { useEffect, useState } from 'react'
+import { CheckLg, ChevronLeft, ChevronRight, QuestionLg, TicketPerforatedFill, XLg } from 'react-bootstrap-icons'
 import { TICKETS } from '../config'
 import { useTickets } from '../lib/useTickets'
 import { Reveal } from '../components/ui/Reveal'
 import { CountUp } from '../components/ui/CountUp'
 import { ReserveModal } from './ReserveModal'
+import { orderTotal } from '../lib/pricing'
+
+const SELECTED = 'bg-orange text-cream shadow-[0_8px_20px_-6px_rgba(252,134,22,.9)] -translate-y-1 scale-110 z-10'
 
 const STYLE = {
   available: 'bg-cream text-bark hover:bg-lime hover:shadow-[0_8px_20px_-6px_rgba(184,193,31,.9)] hover:-translate-y-1 hover:scale-110 hover:z-10',
@@ -17,11 +20,35 @@ const SHEETS = Math.max(1, Math.ceil(TICKETS.total / TICKETS.perSheet))
 
 export function Tickets() {
   const { get, taken, loading, markLocal, online } = useTickets()
-  const [selected, setSelected] = useState<number | null>(null)
+  const [picked, setPicked] = useState<number[]>([])
+  const [order, setOrder] = useState<number[] | null>(null)
+  const [limitHit, setLimitHit] = useState(false)
   const [sheet, setSheet] = useState(0)
   const first = sheet * TICKETS.perSheet + 1
   const last = Math.min(first + TICKETS.perSheet - 1, TICKETS.total)
   const numbers = Array.from({ length: last - first + 1 }, (_, i) => first + i)
+  const stillFree = picked.filter((n) => get(n) === 'available')
+
+  useEffect(() => {
+    if (!order && stillFree.length !== picked.length) setPicked(stillFree)
+  }, [order, stillFree, picked.length])
+
+  useEffect(() => {
+    if (!limitHit) return
+    const t = setTimeout(() => setLimitHit(false), 2500)
+    return () => clearTimeout(t)
+  }, [limitHit])
+
+  const toggle = (n: number) => {
+    setPicked((cur) => {
+      if (cur.includes(n)) return cur.filter((x) => x !== n)
+      if (cur.length >= TICKETS.maxPerOrder) {
+        setLimitHit(true)
+        return cur
+      }
+      return [...cur, n].sort((a, b) => a - b)
+    })
+  }
 
   return (
     <section id="boletos" className="dots relative overflow-hidden px-4 py-28">
@@ -37,6 +64,9 @@ export function Tickets() {
           <p className="mx-auto mt-5 max-w-2xl text-xl text-bark/85">
             Cada boleto cuesta <strong className="text-orange">${TICKETS.price} MXN</strong> o llévate{' '}
             <strong className="text-orange">{TICKETS.promo.qty} por ${TICKETS.promo.price} MXN</strong>. {TICKETS.purpose}
+          </p>
+          <p className="mx-auto mt-2 max-w-2xl text-lg text-bark/75">
+            Toca hasta {TICKETS.maxPerOrder} números para apartarlos juntos.
           </p>
         </Reveal>
 
@@ -104,21 +134,24 @@ export function Tickets() {
               >
                 {numbers.map((n, i) => {
                   const s = get(n)
+                  const on = picked.includes(n) && s === 'available'
                   return (
                     <motion.button
                       key={n}
                       type="button"
                       disabled={s !== 'available' || loading}
-                      onClick={() => setSelected(n)}
+                      onClick={() => toggle(n)}
+                      aria-pressed={on}
                       initial={{ opacity: 0, scale: 0.4 }}
                       whileInView={{ opacity: 1, scale: 1 }}
                       viewport={{ once: true }}
                       transition={{ delay: (i % 20) * 0.02 + Math.floor(i / 20) * 0.03, type: 'spring', stiffness: 260, damping: 18 }}
                       whileTap={s === 'available' ? { scale: 0.85 } : undefined}
-                      aria-label={`Boleto ${n}, ${s === 'available' ? 'disponible' : s === 'paid' ? 'pagado' : 'reservado'}`}
-                      className={`relative aspect-square rounded-xl text-sm transition-[background-color,box-shadow,transform] duration-200 sm:text-base ${STYLE[s]}`}
+                      aria-label={`Boleto ${n}, ${on ? 'seleccionado' : s === 'available' ? 'disponible' : s === 'paid' ? 'pagado' : 'reservado'}`}
+                      className={`relative aspect-square rounded-xl text-sm transition-[background-color,box-shadow,transform] duration-200 sm:text-base ${on ? SELECTED : STYLE[s]}`}
                     >
                       {n}
+                      {on && <CheckLg className="absolute -right-1 -top-1 size-4 rounded-full bg-lime p-0.5 text-bark" />}
                     </motion.button>
                   )
                 })}
@@ -128,8 +161,56 @@ export function Tickets() {
         </Reveal>
       </div>
 
-      {selected !== null && (
-        <ReserveModal number={selected} onClose={() => setSelected(null)} onReserved={(n) => markLocal(n, 'reserved')} online={online} />
+      <AnimatePresence>
+        {stillFree.length > 0 && !order && (
+          <motion.div
+            initial={{ y: 120, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 120, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 26 }}
+            className="fixed inset-x-0 bottom-0 z-50 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
+          >
+            <div className="card mx-auto flex max-w-xl flex-wrap items-center justify-between gap-3 bg-sun p-3 sm:p-4">
+              <div className="min-w-0">
+                <div className="font-display text-2xl text-bark sm:text-3xl">
+                  {stillFree.map((n) => `#${n}`).join(' y ')}
+                </div>
+                <div className="text-sm text-bark/80">
+                  {stillFree.length === TICKETS.promo.qty
+                    ? `Promo ${TICKETS.promo.qty}x$${TICKETS.promo.price}`
+                    : limitHit
+                      ? `Máximo ${TICKETS.maxPerOrder} boletos por registro`
+                      : `Agrega otro y llévate ${TICKETS.promo.qty} por $${TICKETS.promo.price}`}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPicked([])}
+                  aria-label="Quitar selección"
+                  className="grid size-11 place-items-center rounded-full bg-cream text-bark transition hover:bg-sand"
+                >
+                  <XLg className="size-4" />
+                </button>
+                <button type="button" onClick={() => setOrder(stillFree)} className="btn bg-orange !py-2.5 text-cream">
+                  Apartar · ${orderTotal(stillFree.length)}
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {order && (
+        <ReserveModal
+          numbers={order}
+          onClose={() => setOrder(null)}
+          onReserved={(ns) => {
+            ns.forEach((n) => markLocal(n, 'reserved'))
+            setPicked([])
+          }}
+          online={online}
+        />
       )}
     </section>
   )

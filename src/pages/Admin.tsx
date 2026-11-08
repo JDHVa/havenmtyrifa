@@ -2,10 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { SALE_POINTS, TICKETS } from '../config'
 import { formatMty } from '../lib/whatsapp'
+import { orderTotal, ticketShare } from '../lib/pricing'
 
 type Row = {
   number: number
   code: string
+  group_code: string | null
   name: string
   origin: string
   sale_point: string
@@ -27,6 +29,43 @@ const readToken = () => {
 
 const pointLabel = (id: string) => SALE_POINTS.find((p) => p.id === id)?.label ?? id
 
+const money = (n: number) => `$${n.toLocaleString('es-MX', { maximumFractionDigits: 2 })}`
+
+const mtyParts = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/Monterrey',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hourCycle: 'h23',
+})
+
+const excelDate = (iso: string | null) => {
+  if (!iso) return null
+  const p = Object.fromEntries(mtyParts.formatToParts(new Date(iso)).map((x) => [x.type, Number(x.value)]))
+  return Date.UTC(p.year, p.month - 1, p.day, p.hour % 24, p.minute, p.second) / 86400000 + 25569
+}
+
+const DATE_FMT = 'dd/mm/yyyy hh:mm'
+const MONEY_FMT = '"$"#,##0.00'
+
+type Cell = string | number | null
+
+function makeSheet(header: string[], body: Cell[][], widths: number[], formats: Record<number, string>) {
+  const ws = XLSX.utils.aoa_to_sheet([header, ...body])
+  for (let r = 1; r <= body.length; r++) {
+    for (const [c, z] of Object.entries(formats)) {
+      const cell = ws[XLSX.utils.encode_cell({ r, c: Number(c) })]
+      if (cell && cell.t === 'n') cell.z = z
+    }
+  }
+  ws['!cols'] = widths.map((wch) => ({ wch }))
+  if (body.length) ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: body.length, c: header.length - 1 } }) }
+  return ws
+}
+
 export function Admin() {
   const [token, setToken] = useState(readToken)
   const [rows, setRows] = useState<Row[]>([])
@@ -34,6 +73,8 @@ export function Admin() {
   const [filter, setFilter] = useState('')
   const [pointFilter, setPointFilter] = useState('')
   const [confirmRelease, setConfirmRelease] = useState<number | null>(null)
+  const [checked, setChecked] = useState<number[]>([])
+  const [busy, setBusy] = useState(false)
 
   const logout = useCallback(() => {
     try {
@@ -50,24 +91,48 @@ export function Admin() {
     const json = await res.json()
     if (!res.ok) return setError(json.error ?? 'Error')
     setRows(json.rows)
+    setChecked((c) => c.filter((n) => (json.rows as Row[]).some((r) => r.number === n)))
   }, [token, logout])
 
   useEffect(() => {
     if (token) load()
   }, [token, load])
 
-  const act = async (number: number, action: 'paid' | 'unpaid' | 'release') => {
+  const act = async (body: { number?: number; numbers?: number[]; action: 'paid' | 'unpaid' | 'release' | 'group' | 'ungroup' }) => {
     setError('')
+    setBusy(true)
     const res = await fetch('/api/tickets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ number, action }),
+      body: JSON.stringify(body),
     })
+    setBusy(false)
     if (res.status === 401) return logout()
     if (!res.ok) return setError((await res.json()).error ?? 'Error')
     setConfirmRelease(null)
+    if (body.action === 'group') setChecked([])
     load()
   }
+
+  const groupSize = useMemo(() => {
+    const m: Record<string, number> = {}
+    for (const r of rows) if (r.group_code) m[r.group_code] = (m[r.group_code] ?? 0) + 1
+    return m
+  }, [rows])
+
+  const share = useCallback((r: Row) => ticketShare(r.group_code ? groupSize[r.group_code] ?? 1 : 1), [groupSize])
+
+  const orders = useMemo(() => {
+    const m = new Map<string, Row[]>()
+    for (const r of rows) {
+      const key = r.group_code ?? r.code
+      m.set(key, [...(m.get(key) ?? []), r])
+    }
+    return [...m.entries()].map(([key, list]) => ({ key, list, total: orderTotal(list.length) }))
+  }, [rows])
+
+  const toggleCheck = (n: number) =>
+    setChecked((c) => (c.includes(n) ? c.filter((x) => x !== n) : c.length >= 2 ? [c[1], n] : [...c, n]))
 
   const visible = useMemo(() => {
     const f = filter.toLowerCase()
@@ -79,28 +144,81 @@ export function Admin() {
   }, [rows, filter, pointFilter])
 
   const exportExcel = () => {
-    const data = rows.map((r) => ({
-      Boleto: r.number,
-      Folio: r.code,
-      Nombre: r.name,
-      Procedencia: r.origin,
-      'Punto de venta': pointLabel(r.sale_point),
-      'Método de pago': r.payment_method,
-      Estado: r.status === 'paid' ? 'Pagado' : 'Reservado',
-      'Fecha de registro': formatMty(r.reserved_at),
-      'Fecha de pago': r.paid_at ? formatMty(r.paid_at) : '',
-      Monto: TICKETS.price,
-    }))
-    const ws = XLSX.utils.json_to_sheet(data)
-    ws['!cols'] = [6, 16, 28, 28, 22, 14, 10, 26, 26, 8].map((wch) => ({ wch }))
+    const estado = (s: Row['status']) => (s === 'paid' ? 'Pagado' : 'Reservado')
+    const metodo = (m: string) => (m === 'efectivo' ? 'Efectivo' : m === 'transferencia' ? 'Transferencia' : m)
+
+    const tickets = makeSheet(
+      ['Boleto', 'Folio', 'Paquete', 'Nombre', 'Procedencia', 'Punto de venta', 'Método de pago', 'Estado', 'Fecha de registro', 'Fecha de pago', 'Monto'],
+      rows.map((r) => [
+        r.number,
+        r.code,
+        r.group_code ? `${r.group_code} (${TICKETS.promo.qty}x$${TICKETS.promo.price})` : 'Individual',
+        r.name,
+        r.origin,
+        pointLabel(r.sale_point),
+        metodo(r.payment_method),
+        estado(r.status),
+        excelDate(r.reserved_at),
+        excelDate(r.paid_at),
+        share(r),
+      ]),
+      [8, 16, 20, 28, 28, 22, 15, 11, 18, 18, 11],
+      { 8: DATE_FMT, 9: DATE_FMT, 10: MONEY_FMT },
+    )
+
+    const byOrder = makeSheet(
+      ['Pedido', 'Boletos', 'Cantidad', 'Nombre', 'Procedencia', 'Punto de venta', 'Método de pago', 'Estado', 'Fecha de registro', 'Total'],
+      orders.map(({ key, list, total }) => {
+        const r = list[0]
+        const allPaid = list.every((x) => x.status === 'paid')
+        const somePaid = list.some((x) => x.status === 'paid')
+        return [
+          key,
+          list.map((x) => x.number).join(', '),
+          list.length,
+          r.name,
+          r.origin,
+          pointLabel(r.sale_point),
+          metodo(r.payment_method),
+          allPaid ? 'Pagado' : somePaid ? 'Pago parcial' : 'Reservado',
+          excelDate(r.reserved_at),
+          total,
+        ]
+      }),
+      [16, 12, 9, 28, 28, 22, 15, 13, 18, 11],
+      { 8: DATE_FMT, 9: MONEY_FMT },
+    )
+
+    const sum = (list: Row[]) => list.reduce((a, r) => a + share(r), 0)
+    const summaryRows: Cell[][] = [
+      ['Total', rows.length, rows.filter((r) => r.status === 'paid').length, sum(rows.filter((r) => r.status === 'paid')), sum(rows.filter((r) => r.status !== 'paid')), sum(rows)],
+      ...SALE_POINTS.map((p) => {
+        const list = rows.filter((r) => r.sale_point === p.id)
+        const paidList = list.filter((r) => r.status === 'paid')
+        return [p.label, list.length, paidList.length, sum(paidList), sum(list) - sum(paidList), sum(list)] as Cell[]
+      }),
+    ]
+    const summary = makeSheet(
+      ['Punto de venta', 'Boletos apartados', 'Boletos pagados', 'Recaudado', 'Por cobrar', 'Total esperado'],
+      summaryRows,
+      [24, 18, 16, 14, 14, 16],
+      { 3: MONEY_FMT, 4: MONEY_FMT, 5: MONEY_FMT },
+    )
+    delete summary['!autofilter']
+
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Boletos')
-    XLSX.writeFile(wb, `haven-mty-boletos-${new Date().toISOString().slice(0, 10)}.xlsx`)
+    XLSX.utils.book_append_sheet(wb, summary, 'Resumen')
+    XLSX.utils.book_append_sheet(wb, byOrder, 'Pedidos')
+    XLSX.utils.book_append_sheet(wb, tickets, 'Boletos')
+    XLSX.writeFile(wb, `haven-mty-boletos-${new Date().toISOString().slice(0, 10)}.xlsx`, { compression: true })
   }
 
   if (!token) return <Login onToken={setToken} />
 
-  const paid = rows.filter((r) => r.status === 'paid').length
+  const paidRows = rows.filter((r) => r.status === 'paid')
+  const collected = paidRows.reduce((a, r) => a + share(r), 0)
+  const pending = rows.reduce((a, r) => a + share(r), 0) - collected
+  const checkedRows = rows.filter((r) => checked.includes(r.number))
 
   return (
     <main className="min-h-screen bg-cream px-4 py-8 text-bark">
@@ -114,12 +232,13 @@ export function Admin() {
           </div>
         </header>
 
-        <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-5">
           {[
             ['Apartados', rows.length],
-            ['Pagados', paid],
-            ['Pendientes', rows.length - paid],
-            ['Recaudado', `$${paid * TICKETS.price}`],
+            ['Pagados', paidRows.length],
+            ['Pendientes', rows.length - paidRows.length],
+            ['Recaudado', money(collected)],
+            ['Por cobrar', money(pending)],
           ].map(([l, v]) => (
             <div key={l} className="card bg-sun p-3 text-center">
               <div className="font-display text-3xl">{v}</div>
@@ -143,43 +262,99 @@ export function Admin() {
           </select>
         </div>
 
+        <div className="mt-4 flex flex-wrap items-center gap-3 border-4 border-bark bg-sun p-3 font-body text-sm">
+          <span>
+            {checked.length
+              ? `Seleccionados: ${checkedRows.map((r) => `#${r.number}`).join(' y ')}`
+              : `Marca 2 boletos de la misma persona para juntarlos en un paquete ${TICKETS.promo.qty}x$${TICKETS.promo.price}.`}
+          </span>
+          {checked.length > 0 && (
+            <>
+              <button
+                type="button"
+                disabled={checked.length !== 2 || busy}
+                onClick={() => act({ numbers: checked, action: 'group' })}
+                className="border-2 border-bark bg-orange px-3 py-1 text-cream disabled:opacity-50"
+              >
+                Juntar como paquete {TICKETS.promo.qty}x${TICKETS.promo.price}
+              </button>
+              <button type="button" onClick={() => setChecked([])} className="border-2 border-bark bg-cream px-3 py-1">
+                Limpiar
+              </button>
+            </>
+          )}
+        </div>
+
         {error && <p className="mt-4 border-4 border-rust bg-white p-2 text-rust">{error}</p>}
 
         <div className="mt-6 overflow-x-auto border-4 border-bark bg-white">
-          <table className="w-full min-w-[900px] text-left text-sm">
+          <table className="w-full min-w-[1100px] text-left text-sm">
             <thead className="bg-bark font-body text-sun">
               <tr>
-                {['#', 'Folio', 'Nombre', 'Procedencia', 'Punto', 'Pago', 'Registro', 'Estado', 'Acciones'].map((h) => (
-                  <th key={h} className="px-3 py-2">{h}</th>
+                {['', '#', 'Folio', 'Paquete', 'Nombre', 'Procedencia', 'Punto', 'Pago', 'Registro', 'Monto', 'Estado', 'Acciones'].map((h, i) => (
+                  <th key={i} className="px-3 py-2">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {visible.map((r) => (
-                <tr key={r.number} className="border-t-2 border-sand/60">
+                <tr key={r.number} className={`border-t-2 border-sand/60 ${checked.includes(r.number) ? 'bg-sun/40' : ''}`}>
+                  <td className="px-3 py-2">
+                    <input
+                      type="checkbox"
+                      checked={checked.includes(r.number)}
+                      onChange={() => toggleCheck(r.number)}
+                      aria-label={`Seleccionar boleto ${r.number}`}
+                      className="size-4 accent-orange"
+                    />
+                  </td>
                   <td className="px-3 py-2 font-body">{r.number}</td>
                   <td className="px-3 py-2 font-mono text-xs">{r.code}</td>
+                  <td className="px-3 py-2">
+                    {r.group_code ? (
+                      <div className="flex flex-col items-start gap-1">
+                        <span className="bg-orange px-2 py-0.5 font-mono text-xs text-cream">{r.group_code}</span>
+                        <span className="text-xs">
+                          con #{rows.filter((x) => x.group_code === r.group_code && x.number !== r.number).map((x) => x.number).join(', #')}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-bark/60">Individual</span>
+                    )}
+                  </td>
                   <td className="px-3 py-2">{r.name}</td>
                   <td className="px-3 py-2">{r.origin}</td>
                   <td className="px-3 py-2">{pointLabel(r.sale_point)}</td>
                   <td className="px-3 py-2 capitalize">{r.payment_method}</td>
                   <td className="px-3 py-2 text-xs">{formatMty(r.reserved_at)}</td>
+                  <td className="px-3 py-2 font-body">{money(share(r))}</td>
                   <td className="px-3 py-2">
                     <span className={`px-2 py-1 font-body text-xs ${r.status === 'paid' ? 'bg-lime' : 'bg-sun'}`}>
                       {r.status === 'paid' ? 'Pagado' : 'Reservado'}
                     </span>
                   </td>
                   <td className="px-3 py-2">
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => act(r.number, r.status === 'paid' ? 'unpaid' : 'paid')}
-                        className="border-2 border-bark bg-lime px-2 py-1 text-xs hover:brightness-95"
+                        disabled={busy}
+                        onClick={() => act({ number: r.number, action: r.status === 'paid' ? 'unpaid' : 'paid' })}
+                        className="border-2 border-bark bg-lime px-2 py-1 text-xs hover:brightness-95 disabled:opacity-50"
                       >
-                        {r.status === 'paid' ? 'Desmarcar' : 'Pagado'}
+                        {r.status === 'paid' ? 'Desmarcar' : r.group_code ? 'Pagado (paquete)' : 'Pagado'}
                       </button>
+                      {r.group_code && (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => act({ number: r.number, action: 'ungroup' })}
+                          className="border-2 border-bark bg-cream px-2 py-1 text-xs disabled:opacity-50"
+                        >
+                          Separar
+                        </button>
+                      )}
                       {confirmRelease === r.number ? (
-                        <button type="button" onClick={() => act(r.number, 'release')} className="border-2 border-bark bg-rust px-2 py-1 text-xs text-white">
+                        <button type="button" disabled={busy} onClick={() => act({ number: r.number, action: 'release' })} className="border-2 border-bark bg-rust px-2 py-1 text-xs text-white">
                           ¿Seguro?
                         </button>
                       ) : (
@@ -193,7 +368,7 @@ export function Admin() {
               ))}
               {!visible.length && (
                 <tr>
-                  <td colSpan={9} className="px-3 py-8 text-center font-body">Sin boletos apartados.</td>
+                  <td colSpan={12} className="px-3 py-8 text-center font-body">Sin boletos apartados.</td>
                 </tr>
               )}
             </tbody>

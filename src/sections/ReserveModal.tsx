@@ -4,6 +4,7 @@ import { CashCoin, CreditCard, ExclamationTriangleFill, Whatsapp, XLg } from 're
 import { SALE_POINTS, TICKETS, type PaymentMethod, type SalePointId } from '../config'
 import { supabase } from '../lib/supabase'
 import { buildWhatsAppLink, formatMty } from '../lib/whatsapp'
+import { orderTotal } from '../lib/pricing'
 
 const ORIGINS = [
   { id: 'prepa', label: 'Preparatoria', placeholder: '¿Cuál prepa?' },
@@ -14,10 +15,11 @@ const ORIGINS = [
 
 type OriginId = (typeof ORIGINS)[number]['id']
 
-type Result = { code: string; reservedAt: string; link: string }
+type Result = { tickets: { number: number; code: string }[]; groupCode: string | null; reservedAt: string; link: string }
 
 const ERRORS: Record<string, string> = {
-  taken: 'Ese boleto acaba de ser apartado por alguien más. Elige otro.',
+  taken: 'Alguno de tus boletos acaba de ser apartado por alguien más. Elige otro.',
+  invalid_count: `Puedes apartar hasta ${TICKETS.maxPerOrder} boletos por registro.`,
   invalid_name: 'Escribe tu nombre completo.',
   invalid_origin: 'Dinos de dónde vienes.',
 }
@@ -25,14 +27,14 @@ const ERRORS: Record<string, string> = {
 const field = 'w-full rounded-2xl border-2 border-bark/20 bg-cream px-4 py-3 text-lg text-bark outline-none transition focus:border-orange focus:bg-white focus:ring-4 focus:ring-orange/20'
 
 export function ReserveModal({
-  number,
+  numbers,
   onClose,
   onReserved,
   online,
 }: {
-  number: number
+  numbers: number[]
   onClose: () => void
-  onReserved: (n: number) => void
+  onReserved: (n: number[]) => void
   online: boolean
 }) {
   const [name, setName] = useState('')
@@ -56,6 +58,9 @@ export function ReserveModal({
 
   const origin = `${ORIGINS.find((o) => o.id === originType)!.label.replace('…', '')} ${originDetail}`.trim()
   const point = SALE_POINTS.find((p) => p.id === salePoint)!
+  const total = orderTotal(numbers.length)
+  const many = numbers.length > 1
+  const codes = result?.tickets.map((t) => t.code).join(', ') ?? ''
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -63,11 +68,12 @@ export function ReserveModal({
     if (name.trim().length < 2) return setError(ERRORS.invalid_name)
     if (originDetail.trim().length < 2) return setError(ERRORS.invalid_origin)
     setBusy(true)
-    let code = `HVN-${String(number).padStart(3, '0')}-DEMO`
+    let tickets = numbers.map((n) => ({ number: n, code: `HVN-${String(n).padStart(3, '0')}-DEMO` }))
+    let groupCode: string | null = numbers.length > 1 ? 'PAQ-DEMO' : null
     let reservedAt = new Date().toISOString()
     if (supabase) {
-      const { data, error: err } = await supabase.rpc('reserve_ticket', {
-        p_number: number,
+      const { data, error: err } = await supabase.rpc('reserve_tickets', {
+        p_numbers: numbers,
         p_name: name.trim(),
         p_origin: origin,
         p_sale_point: salePoint,
@@ -78,15 +84,17 @@ export function ReserveModal({
         const key = Object.keys(ERRORS).find((k) => err.message.includes(k))
         return setError(key ? ERRORS[key] : 'No se pudo reservar. Intenta de nuevo.')
       }
-      const row = (data as { code: string; reserved_at: string }[])[0]
-      code = row.code
-      reservedAt = row.reserved_at
+      const rows = data as { number: number; code: string; group_code: string | null; reserved_at: string }[]
+      tickets = rows.map((r) => ({ number: r.number, code: r.code }))
+      groupCode = rows[0]?.group_code ?? null
+      reservedAt = rows[0]?.reserved_at ?? reservedAt
     }
-    onReserved(number)
+    onReserved(numbers)
     setResult({
-      code,
+      tickets,
+      groupCode,
       reservedAt,
-      link: buildWhatsAppLink({ number, code, name: name.trim(), origin, salePoint, payment, reservedAt }),
+      link: buildWhatsAppLink({ tickets, groupCode, name: name.trim(), origin, salePoint, payment, reservedAt }),
     })
     setBusy(false)
   }
@@ -111,9 +119,16 @@ export function ReserveModal({
           className="card max-h-[92svh] w-full max-w-lg overflow-y-auto rounded-b-none bg-sun p-6 sm:rounded-b-[1.75rem]"
         >
           <div className="flex items-start justify-between gap-4">
-            <h3 id="reserve-title" className="font-display text-5xl text-bark">
-              Boleto #{number}
-            </h3>
+            <div>
+              <h3 id="reserve-title" className="font-display text-5xl text-bark">
+                {many ? 'Boletos' : 'Boleto'} {numbers.map((n) => `#${n}`).join(' y ')}
+              </h3>
+              {many && (
+                <p className="mt-1 inline-block rounded-full bg-orange px-3 py-0.5 font-body text-sm text-cream">
+                  Promo {TICKETS.promo.qty}x${TICKETS.promo.price}
+                </p>
+              )}
+            </div>
             <button type="button" onClick={onClose} className="grid size-10 place-items-center rounded-full bg-cream text-bark transition hover:rotate-90 hover:bg-orange hover:text-cream" aria-label="Cerrar">
               <XLg className="size-4" />
             </button>
@@ -183,7 +198,7 @@ export function ReserveModal({
               {error && <p className="rounded-2xl border-2 border-rust bg-cream p-3 font-body text-sm text-rust">{error}</p>}
 
               <button type="submit" disabled={busy} className="btn mt-2 bg-orange text-cream disabled:opacity-60">
-                {busy ? 'Apartando…' : `Apartar boleto · $${TICKETS.price}`}
+                {busy ? 'Apartando…' : `Apartar ${many ? `${numbers.length} boletos` : 'boleto'} · $${total}`}
               </button>
               {!online && <p className="text-center font-body text-xs">Modo demo: no se guardará.</p>}
             </form>
@@ -201,19 +216,24 @@ export function ReserveModal({
                 <div>
                   <p className="font-display text-4xl">¡Apartado!</p>
                   <p className="font-body">
-                    Folio: <strong>{result.code}</strong>
+                    {many ? 'Folios' : 'Folio'}: <strong>{codes}</strong>
                   </p>
+                  {result.groupCode && (
+                    <p className="font-body text-sm">
+                      Paquete: <strong>{result.groupCode}</strong>
+                    </p>
+                  )}
                   <p className="text-sm">{formatMty(result.reservedAt)}</p>
                 </div>
               </div>
 
               <div className="rounded-2xl bg-cream p-4">
                 <p className="flex items-center gap-2 font-body text-base text-rust">
-                  <ExclamationTriangleFill className="size-5 shrink-0" /> Tu boleto aún no está confirmado.
+                  <ExclamationTriangleFill className="size-5 shrink-0" /> {many ? 'Tus boletos aún no están confirmados.' : 'Tu boleto aún no está confirmado.'}
                 </p>
                 <p className="mt-1">
                   Manda el mensaje por WhatsApp a <strong>{point.contact}</strong> ({point.label}) para acordar el pago de{' '}
-                  <strong>${TICKETS.price} MXN</strong>. Si no se paga, el equipo puede liberar el número.
+                  <strong>${total} MXN</strong>. Si no se paga, el equipo puede liberar {many ? 'los números' : 'el número'}.
                 </p>
               </div>
 
@@ -229,7 +249,7 @@ export function ReserveModal({
                   <p className="flex items-start gap-2">
                     <CreditCard className="mt-1 size-5 shrink-0 text-olive" />
                     <span>
-                      Pagarás por <strong>transferencia</strong>. {point.contact} te pasará el número por WhatsApp. Envía tu comprobante con el folio {result.code}.
+                      Pagarás por <strong>transferencia</strong>. {point.contact} te pasará el número por WhatsApp. Envía tu comprobante con {many ? 'los folios' : 'el folio'} {codes}.
                     </span>
                   </p>
                 )}

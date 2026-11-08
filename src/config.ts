@@ -10,6 +10,7 @@ export const TICKETS = {
   perSheet: 200,
   price: 150,
   promo: { qty: 2, price: 200 },
+  maxPerOrder: 2,
   purpose: 'Los boletos son para apoyar la realización del evento Haven Mty.',
 }
 

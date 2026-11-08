@@ -1,4 +1,5 @@
 import { SALE_POINTS, TICKETS, type PaymentMethod, type SalePointId } from '../config'
+import { orderTotal } from './pricing'
 
 export const formatMty = (iso: string) =>
   new Intl.DateTimeFormat('es-MX', {
@@ -8,8 +9,8 @@ export const formatMty = (iso: string) =>
   }).format(new Date(iso))
 
 export function buildWhatsAppLink(input: {
-  number: number
-  code: string
+  tickets: { number: number; code: string }[]
+  groupCode: string | null
   name: string
   origin: string
   salePoint: SalePointId
@@ -17,20 +18,25 @@ export function buildWhatsAppLink(input: {
   reservedAt: string
 }) {
   const point = SALE_POINTS.find((p) => p.id === input.salePoint)!
+  const many = input.tickets.length > 1
+  const total = orderTotal(input.tickets.length)
   const pay =
     input.payment === 'efectivo'
       ? 'Voy a pagar en efectivo.'
       : '¿Me puedes pasar el número para poder transferir?'
   const text = [
-    `Hola ${point.contact}, reservé un boleto para Haven Mty.`,
+    many
+      ? `Hola ${point.contact}, reservé ${input.tickets.length} boletos para Haven Mty (promo ${TICKETS.promo.qty}x$${TICKETS.promo.price}).`
+      : `Hola ${point.contact}, reservé un boleto para Haven Mty.`,
     '',
-    `Boleto: #${input.number}`,
-    `Folio: ${input.code}`,
+    `${many ? 'Boletos' : 'Boleto'}: ${input.tickets.map((t) => `#${t.number}`).join(', ')}`,
+    `${many ? 'Folios' : 'Folio'}: ${input.tickets.map((t) => t.code).join(', ')}`,
+    ...(input.groupCode ? [`Paquete: ${input.groupCode}`] : []),
     `Nombre: ${input.name}`,
     `Procedencia: ${input.origin}`,
     `Punto de venta: ${point.label}`,
     `Registro: ${formatMty(input.reservedAt)}`,
-    `Monto: $${TICKETS.price} MXN`,
+    `Monto: $${total} MXN`,
     '',
     pay,
     '',

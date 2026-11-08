@@ -6,7 +6,7 @@ import { Reveal } from '../components/ui/Reveal'
 
 const QA = [
   ['¿Para qué es el dinero de los boletos?', TICKETS.purpose],
-  ['¿Cuánto cuesta?', `$${TICKETS.price} MXN por boleto. Puedes apartar varios números.`],
+  ['¿Cuánto cuesta?', `$${TICKETS.price} MXN por boleto o ${TICKETS.promo.qty} por $${TICKETS.promo.price} MXN. Puedes apartar hasta ${TICKETS.maxPerOrder} números juntos en un mismo registro.`],
   ['¿Cómo pago?', 'En efectivo con tu punto de venta o por transferencia. Si eliges transferencia, tu contacto te pasa el número por WhatsApp.'],
   ['¿Mi boleto queda confirmado al apartarlo?', 'No. Queda reservado hasta que mandes el mensaje y pagues. Si no se paga, el equipo puede liberar el número.'],
   ['¿Dónde es el sorteo?', 'El sorteo se hace durante el evento, no en esta página.'],
