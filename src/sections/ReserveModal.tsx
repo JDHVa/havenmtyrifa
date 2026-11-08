@@ -15,7 +15,7 @@ const ORIGINS = [
 
 type OriginId = (typeof ORIGINS)[number]['id']
 
-type Result = { tickets: { number: number; code: string }[]; groupCode: string | null; reservedAt: string; link: string }
+type Result = { tickets: { number: number; code: string }[]; groupCode: string | null; reservedAt: string; link: string; note?: string }
 
 const ERRORS: Record<string, string> = {
   taken: 'Alguno de tus boletos acaba de ser apartado por alguien más. Elige otro.',
@@ -58,8 +58,9 @@ export function ReserveModal({
 
   const origin = `${ORIGINS.find((o) => o.id === originType)!.label.replace('…', '')} ${originDetail}`.trim()
   const point = SALE_POINTS.find((p) => p.id === salePoint)!
-  const total = orderTotal(numbers.length)
-  const many = numbers.length > 1
+  const count = result ? result.tickets.length : numbers.length
+  const total = orderTotal(count)
+  const many = count > 1
   const codes = result?.tickets.map((t) => t.code).join(', ') ?? ''
 
   const submit = async (e: React.FormEvent) => {
@@ -71,29 +72,44 @@ export function ReserveModal({
     let tickets = numbers.map((n) => ({ number: n, code: `HVN-${String(n).padStart(3, '0')}-DEMO` }))
     let groupCode: string | null = numbers.length > 1 ? 'PAQ-DEMO' : null
     let reservedAt = new Date().toISOString()
-    if (supabase) {
-      const { data, error: err } = await supabase.rpc('reserve_tickets', {
-        p_numbers: numbers,
-        p_name: name.trim(),
-        p_origin: origin,
-        p_sale_point: salePoint,
-        p_payment_method: payment,
-      })
-      if (err) {
-        setBusy(false)
-        const key = Object.keys(ERRORS).find((k) => err.message.includes(k))
-        return setError(key ? ERRORS[key] : 'No se pudo reservar. Intenta de nuevo.')
-      }
-      const rows = data as { number: number; code: string; group_code: string | null; reserved_at: string }[]
-      tickets = rows.map((r) => ({ number: r.number, code: r.code }))
-      groupCode = rows[0]?.group_code ?? null
-      reservedAt = rows[0]?.reserved_at ?? reservedAt
+    let note: string | undefined
+    const fail = (message: string) => {
+      setBusy(false)
+      const key = Object.keys(ERRORS).find((k) => message.includes(k))
+      setError(key ? ERRORS[key] : 'No se pudo reservar. Intenta de nuevo.')
     }
-    onReserved(numbers)
+    if (supabase) {
+      const common = { p_name: name.trim(), p_origin: origin, p_sale_point: salePoint, p_payment_method: payment }
+      const { data, error: err } = await supabase.rpc('reserve_tickets', { p_numbers: numbers, ...common })
+      const legacy = !!err && (err.code === 'PGRST202' || err.message.includes('reserve_tickets'))
+      if (err && !legacy) return fail(err.message)
+      if (!legacy) {
+        const rows = data as { number: number; code: string; group_code: string | null; reserved_at: string }[]
+        tickets = rows.map((r) => ({ number: r.number, code: r.code }))
+        groupCode = rows[0]?.group_code ?? null
+        reservedAt = rows[0]?.reserved_at ?? reservedAt
+      } else {
+        tickets = []
+        groupCode = null
+        for (const n of numbers) {
+          const one = await supabase.rpc('reserve_ticket', { p_number: n, ...common })
+          if (one.error) {
+            if (!tickets.length) return fail(one.error.message)
+            note = `El boleto #${n} ya no estaba disponible; solo se apartó #${tickets.map((t) => t.number).join(', #')}.`
+            continue
+          }
+          const row = (one.data as { code: string; reserved_at: string }[])[0]
+          tickets.push({ number: n, code: row.code })
+          reservedAt = row.reserved_at
+        }
+      }
+    }
+    onReserved(tickets.map((t) => t.number))
     setResult({
       tickets,
       groupCode,
       reservedAt,
+      note,
       link: buildWhatsAppLink({ tickets, groupCode, name: name.trim(), origin, salePoint, payment, reservedAt }),
     })
     setBusy(false)
@@ -121,7 +137,7 @@ export function ReserveModal({
           <div className="flex items-start justify-between gap-4">
             <div>
               <h3 id="reserve-title" className="font-display text-5xl text-bark">
-                {many ? 'Boletos' : 'Boleto'} {numbers.map((n) => `#${n}`).join(' y ')}
+                {many ? 'Boletos' : 'Boleto'} {(result ? result.tickets.map((t) => t.number) : numbers).map((n) => `#${n}`).join(' y ')}
               </h3>
               {many && (
                 <p className="mt-1 inline-block rounded-full bg-orange px-3 py-0.5 font-body text-sm text-cream">
@@ -226,6 +242,8 @@ export function ReserveModal({
                   <p className="text-sm">{formatMty(result.reservedAt)}</p>
                 </div>
               </div>
+
+              {result.note && <p className="rounded-2xl border-2 border-rust bg-cream p-3 font-body text-sm text-rust">{result.note}</p>}
 
               <div className="rounded-2xl bg-cream p-4">
                 <p className="flex items-center gap-2 font-body text-base text-rust">

@@ -106,6 +106,7 @@ export function Admin() {
   const [confirmRelease, setConfirmRelease] = useState<number | null>(null)
   const [checked, setChecked] = useState<number[]>([])
   const [busy, setBusy] = useState(false)
+  const [groupsReady, setGroupsReady] = useState(true)
 
   const logout = useCallback(() => {
     try {
@@ -122,6 +123,7 @@ export function Admin() {
     const json = await res.json()
     if (!res.ok) return setError(json.error ?? 'Error')
     setRows(json.rows)
+    setGroupsReady(json.groups !== false)
     setChecked((c) => c.filter((n) => (json.rows as Row[]).some((r) => r.number === n)))
   }, [token, logout])
 
@@ -329,6 +331,13 @@ export function Admin() {
             </>
           )}
         </div>
+
+        {!groupsReady && (
+          <p className="mt-4 border-4 border-orange bg-white p-2 font-body text-sm">
+            Tus datos están bien. Para poder juntar boletos en paquetes 2x${TICKETS.promo.price}, corre una vez{' '}
+            <code>supabase/migrations/002_multi_tickets.sql</code> en el SQL editor de Supabase. Solo agrega una columna; no borra nada.
+          </p>
+        )}
 
         {error && <p className="mt-4 border-4 border-rust bg-white p-2 text-rust">{error}</p>}
 
