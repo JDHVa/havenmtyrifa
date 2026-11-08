@@ -66,6 +66,37 @@ function makeSheet(header: string[], body: Cell[][], widths: number[], formats: 
   return ws
 }
 
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
+async function saveWorkbook(wb: XLSX.WorkBook, filename: string) {
+  const data = XLSX.write(wb, { bookType: 'xlsx', type: 'array', compression: true }) as ArrayBuffer
+  const blob = new Blob([data], { type: XLSX_MIME })
+  const touch = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
+  if (touch && typeof File !== 'undefined' && navigator.canShare) {
+    const file = new File([blob], filename, { type: XLSX_MIME })
+    if (navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: filename })
+        return
+      } catch (e) {
+        if ((e as Error).name === 'AbortError') return
+      }
+    }
+  }
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.rel = 'noopener'
+  a.style.display = 'none'
+  document.body.appendChild(a)
+  a.click()
+  setTimeout(() => {
+    a.remove()
+    URL.revokeObjectURL(url)
+  }, 60000)
+}
+
 export function Admin() {
   const [token, setToken] = useState(readToken)
   const [rows, setRows] = useState<Row[]>([])
@@ -210,7 +241,7 @@ export function Admin() {
     XLSX.utils.book_append_sheet(wb, summary, 'Resumen')
     XLSX.utils.book_append_sheet(wb, byOrder, 'Pedidos')
     XLSX.utils.book_append_sheet(wb, tickets, 'Boletos')
-    XLSX.writeFile(wb, `haven-mty-boletos-${new Date().toISOString().slice(0, 10)}.xlsx`, { compression: true })
+    return saveWorkbook(wb, `haven-mty-boletos-${new Date().toISOString().slice(0, 10)}.xlsx`)
   }
 
   if (!token) return <Login onToken={setToken} />
@@ -227,7 +258,21 @@ export function Admin() {
           <h1 className="font-display text-4xl">Panel Haven MTY</h1>
           <div className="flex flex-wrap gap-4">
             <button type="button" onClick={load} className="btn bg-sun !py-2">Actualizar</button>
-            <button type="button" onClick={exportExcel} className="btn bg-lime !py-2">Exportar Excel</button>
+            <button
+              type="button"
+              onClick={async () => {
+                setError('')
+                if (!rows.length) return setError('No hay boletos apartados para exportar. Dale a Actualizar primero.')
+                try {
+                  await exportExcel()
+                } catch (e) {
+                  setError(`No se pudo exportar el Excel: ${(e as Error).message}`)
+                }
+              }}
+              className="btn bg-lime !py-2"
+            >
+              Exportar Excel
+            </button>
             <button type="button" onClick={logout} className="btn bg-sand !py-2">Salir</button>
           </div>
         </header>
